@@ -1,0 +1,33 @@
+services:
+  web:
+    build:
+      context: .
+      target: web
+    image: laminate-workbench-web:latest
+    container_name: laminate-workbench-web
+    ports:
+      # 宿主机端口可通过 .env / 环境变量 WEB_PORT 配置，默认 8080
+      - "${WEB_PORT:-8080}:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 3s
+
+  # 验收服务（一次性）：
+  #   docker compose build verify && docker compose run --rm verify
+  # 运行单元/性质测试、Web HTTP 冒烟与三态端到端冒烟，全部通过后退出码 0。
+  verify:
+    build:
+      context: .
+      target: verify
+    image: laminate-workbench-verify:latest
+    profiles: ["verify"]
+    environment:
+      WEB_URL: "http://web:80"
+    depends_on:
+      web:
+        condition: service_healthy
+    command: ["bash", "scripts/verify.sh"]
